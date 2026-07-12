@@ -1,0 +1,99 @@
+# =====================================================================
+# prompts.yaml — prompt library for the AI translation service.
+#
+# Prompt TEXT lives here (Jinja2 templates); per-language behavior lives in
+# `locales`. Growing the service = add a locale row or a prompt entry here,
+# with no change to the Python call sites.
+# =====================================================================
+version: 2
+
+# Every locale inherits these, then overrides what it needs. Keeping all keys
+# present (even as null / []) means the template's {% if %} guards never hit an
+# undefined variable under StrictUndefined.
+locale_defaults:
+  register: null       # short description of the target variety/style
+  formality: null      # how to address the reader (e.g. "usted", "Sie", "polite です/ます form")
+  notes: []            # extra language-specific instructions (list of strings)
+
+# target locale code -> per-language config. es-MX is the assignment's target;
+# the rest demonstrate the pattern — formality, script, dialect, and RTL all
+# differ by language, which a single shared prompt string cannot capture.
+locales:
+  es-MX:
+    name: "Mexican Spanish (es-MX)"
+    register: "natural, everyday Mexican Spanish as spoken in Mexico"
+    formality: "usted"
+    notes:
+      - "Use Mexican vocabulary and idioms; avoid Castilian/Spain-specific terms."
+      - "Never use vosotros — use ustedes for plural you."
+  es-ES:
+    name: "Castilian Spanish (es-ES)"
+    register: "natural Peninsular Spanish as spoken in Spain"
+    formality: "usted"
+    notes:
+      - "Use vosotros for informal plural you where natural."
+  es:
+    name: "Latin American Spanish (es)"
+    register: "neutral, broadly Latin American Spanish"
+    formality: "usted"
+    notes:
+      - "Avoid region-specific slang; keep it understandable across Latin America."
+  fr:
+    name: "French (fr)"
+    formality: "vous"
+  de:
+    name: "German (de)"
+    formality: "Sie"
+  pt-BR:
+    name: "Brazilian Portuguese (pt-BR)"
+    formality: "você"
+    notes:
+      - "Use Brazilian vocabulary and spelling, not European Portuguese."
+  ja:
+    name: "Japanese (ja)"
+    formality: "polite form (です/ます)"
+    notes:
+      - "Do not use casual/plain form for UI or marketing copy."
+  zh-Hans:
+    name: "Simplified Chinese (zh-Hans)"
+    notes:
+      - "Write in Simplified Chinese characters only — never Traditional."
+  ar:
+    name: "Arabic (ar)"
+    register: "Modern Standard Arabic (MSA)"
+    notes:
+      - "Use MSA, not a regional dialect."
+      - "Arabic is right-to-left; keep Latin-script tokens (codes, URLs, brands) left-to-right and unchanged."
+
+prompts:
+  translate_system:
+    description: >-
+      System prompt for translation. Pins the target language variety, formality,
+      and any language-specific rules, then the shared translation rules.
+      Variables: locale (a merged dict: name, register, formality, notes).
+    template: |
+      You are a professional localizer translating English web-page text into
+      {{ locale.name }}{% if locale.register %} — {{ locale.register }}{% endif %}.
+      Translate faithfully and idiomatically — sound like a native speaker, never
+      a literal word-for-word machine.
+
+      Rules:
+      - Output ONLY the translation. No preamble, no quotation marks around it,
+        no notes, no explanations, no alternatives.
+      - Preserve verbatim and unchanged: numbers, prices and currency ($, digits,
+        decimals), measurements and units, dates, product and brand names,
+        model/SKU codes, URLs, emails, and any code or placeholder tokens.
+      - Keep the original meaning, tone, and formatting (acronym casing, line
+        breaks). Do not add or drop information.
+      {% if locale.formality %}
+      - Address the reader using {{ locale.formality }}.
+      {% endif %}
+      - If the text is already in the target language, or is purely a number,
+        code, or symbol with nothing to translate, return it exactly as given.
+      {% if locale.notes %}
+
+      {{ locale.name }} specifics:
+      {% for note in locale.notes %}
+      - {{ note }}
+      {% endfor %}
+      {% endif %}
