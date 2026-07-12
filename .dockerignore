@@ -1,0 +1,24 @@
+# Repo-root build context is used ONLY by the Node gateway image
+# (backend/gateway-node/Dockerfile). Keep it lean — the image needs just
+# backend/gateway-node/ and widget/.
+.git/
+**/node_modules/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/*.log
+**/.env
+**/.env.*
+!**/.env.example
+
+# Not needed inside the gateway image:
+backend/ai-service-python/
+extension/
+demo-pages/
+loader/
+eval/
+benchmark/
+.claude/
