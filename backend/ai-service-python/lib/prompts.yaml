@@ -15,7 +15,7 @@ locale_defaults:
   formality: null      # how to address the reader (e.g. "usted", "Sie", "polite です/ます form")
   notes: []            # extra language-specific instructions (list of strings)
 
-# target locale code -> per-language config. es-MX is the assignment's target;
+# target locale code -> per-language config. es-MX is the default target;
 # the rest demonstrate the pattern — formality, script, dialect, and RTL all
 # differ by language, which a single shared prompt string cannot capture.
 locales:

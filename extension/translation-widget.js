@@ -1,5 +1,5 @@
 /*
- * FDE · Assignment 1 · Live Translate Widget  (PROVIDED — do not rewrite)
+ * Glosa — Live Translate Widget
  * -----------------------------------------------------------------------
  * A self-contained, dependency-free translation widget for any web page.
  * It translates the whole page into Mexican Spanish on demand and can
@@ -10,21 +10,20 @@
  *   2. Loaded as a Chrome extension          (see ../extension/)
  *   3. Injected via <script> tag             (served by the Node gateway at /widget.js)
  *
- * It talks ONLY to your Node gateway (default http://localhost:8787), using
- * POST /translate/batch. Your job is to build the backend so this lights up.
- * You do not need to edit this file — reading it tells you what the backend
- * must return.
+ * It talks ONLY to the Node gateway (default http://localhost:8787), using
+ * POST /translate/batch. The request/response shapes it expects are the
+ * contract the gateway and AI service implement.
  *
- * Override config before load with:  window.FDE_CONFIG = { API_URL: "..." }
+ * Override config before load with:  window.GLOSA_CONFIG = { API_URL: "..." }
  */
 (function () {
   "use strict";
 
-  if (window.__FDE_TRANSLATE_LOADED__) {
-    console.warn("[FDE] Widget already loaded on this page.");
+  if (window.__GLOSA_TRANSLATE_LOADED__) {
+    console.warn("[Glosa] Widget already loaded on this page.");
     return;
   }
-  window.__FDE_TRANSLATE_LOADED__ = true;
+  window.__GLOSA_TRANSLATE_LOADED__ = true;
 
   const CONFIG = Object.assign(
     {
@@ -32,7 +31,7 @@
       TARGET: "es-MX", // Mexican Spanish
       BATCH_SIZE: 40, // nodes per /translate/batch call
     },
-    window.FDE_CONFIG || {}
+    window.GLOSA_CONFIG || {}
   );
 
   // ---- state --------------------------------------------------------------
@@ -50,80 +49,80 @@
   // Design tokens: one accent (emerald), one radius scale (pill FAB/badges,
   // 16px panel, 10px controls), off-black surfaces, tinted shadows.
   const css = `
-  .fde-root, .fde-root *{box-sizing:border-box}
-  .fde-fab{position:fixed;right:22px;bottom:22px;width:54px;height:54px;border-radius:999px;
+  .glosa-root, .glosa-root *{box-sizing:border-box}
+  .glosa-fab{position:fixed;right:22px;bottom:22px;width:54px;height:54px;border-radius:999px;
     display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2147483647;
     color:#fff;background:#0b0b0c;border:1px solid rgba(255,255,255,.12);
     box-shadow:0 10px 30px rgba(11,11,12,.28), inset 0 1px 0 rgba(255,255,255,.14);
     transition:transform .16s cubic-bezier(.16,1,.3,1), box-shadow .16s ease}
-  .fde-fab svg{width:24px;height:24px}
-  .fde-fab:hover{transform:translateY(-1px) scale(1.05);box-shadow:0 16px 40px rgba(11,11,12,.34), inset 0 1px 0 rgba(255,255,255,.16)}
-  .fde-fab:active{transform:scale(.96)}
-  .fde-fab:focus-visible{outline:2px solid #10b981;outline-offset:3px}
+  .glosa-fab svg{width:24px;height:24px}
+  .glosa-fab:hover{transform:translateY(-1px) scale(1.05);box-shadow:0 16px 40px rgba(11,11,12,.34), inset 0 1px 0 rgba(255,255,255,.16)}
+  .glosa-fab:active{transform:scale(.96)}
+  .glosa-fab:focus-visible{outline:2px solid #10b981;outline-offset:3px}
 
-  .fde-panel{position:fixed;right:22px;bottom:88px;width:320px;max-width:calc(100vw - 44px);
+  .glosa-panel{position:fixed;right:22px;bottom:88px;width:320px;max-width:calc(100vw - 44px);
     z-index:2147483647;overflow:hidden;border-radius:16px;
     font:14px/1.45 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
     color:#18181b;background:#fff;border:1px solid rgba(9,9,11,.08);
     box-shadow:0 24px 60px rgba(11,11,12,.20), 0 2px 8px rgba(11,11,12,.08);
     opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;
     transition:opacity .16s ease, transform .16s cubic-bezier(.16,1,.3,1)}
-  .fde-panel.open{opacity:1;transform:none;pointer-events:auto}
+  .glosa-panel.open{opacity:1;transform:none;pointer-events:auto}
 
-  .fde-head{display:flex;align-items:center;gap:10px;padding:14px 16px;
+  .glosa-head{display:flex;align-items:center;gap:10px;padding:14px 16px;
     background:#0b0b0c;color:#fff}
-  .fde-head .fde-hicon{display:flex;width:26px;height:26px;align-items:center;justify-content:center;
+  .glosa-head .glosa-hicon{display:flex;width:26px;height:26px;align-items:center;justify-content:center;
     border-radius:8px;background:rgba(255,255,255,.10)}
-  .fde-head .fde-hicon svg{width:16px;height:16px}
-  .fde-head .fde-title{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
-  .fde-head .fde-sub{font-size:11.5px;color:rgba(255,255,255,.55);margin-top:1px}
-  .fde-head .fde-x{margin-left:auto;display:flex;width:28px;height:28px;align-items:center;justify-content:center;
+  .glosa-head .glosa-hicon svg{width:16px;height:16px}
+  .glosa-head .glosa-title{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+  .glosa-head .glosa-sub{font-size:11.5px;color:rgba(255,255,255,.55);margin-top:1px}
+  .glosa-head .glosa-x{margin-left:auto;display:flex;width:28px;height:28px;align-items:center;justify-content:center;
     border:none;border-radius:8px;background:transparent;color:rgba(255,255,255,.7);cursor:pointer;transition:background .12s}
-  .fde-head .fde-x svg{width:16px;height:16px}
-  .fde-head .fde-x:hover{background:rgba(255,255,255,.12);color:#fff}
+  .glosa-head .glosa-x svg{width:16px;height:16px}
+  .glosa-head .glosa-x:hover{background:rgba(255,255,255,.12);color:#fff}
 
-  .fde-body{padding:16px;display:flex;flex-direction:column;gap:12px}
-  .fde-lead{margin:0;color:#52525b;font-size:13px}
-  .fde-badges{display:flex;gap:6px;flex-wrap:wrap}
-  .fde-badges:empty{display:none}
-  .fde-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;
+  .glosa-body{padding:16px;display:flex;flex-direction:column;gap:12px}
+  .glosa-lead{margin:0;color:#52525b;font-size:13px}
+  .glosa-badges{display:flex;gap:6px;flex-wrap:wrap}
+  .glosa-badges:empty{display:none}
+  .glosa-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:600;
     padding:2px 9px;border-radius:999px;background:#f4f4f5;color:#52525b}
-  .fde-badge.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
-  .fde-badge.hit{background:#dcfce7;color:#15803d}
+  .glosa-badge.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:500}
+  .glosa-badge.hit{background:#dcfce7;color:#15803d}
 
-  .fde-row{display:flex;gap:8px}
-  .fde-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;
+  .glosa-row{display:flex;gap:8px}
+  .glosa-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;
     border:1px solid rgba(9,9,11,.14);background:#fff;color:#18181b;border-radius:10px;
     padding:10px;font:inherit;font-weight:600;cursor:pointer;
     transition:transform .1s ease, background .12s, border-color .12s, opacity .12s}
-  .fde-btn:hover{background:#f4f4f5}
-  .fde-btn:active{transform:translateY(1px) scale(.985)}
-  .fde-btn:focus-visible{outline:2px solid #10b981;outline-offset:2px}
-  .fde-btn[disabled]{opacity:.55;cursor:default;transform:none}
-  .fde-btn.primary{background:#0b0b0c;color:#fff;border-color:#0b0b0c}
-  .fde-btn.primary:hover{background:#26262b}
-  .fde-btn.ghost{border-color:transparent;color:#71717a;font-weight:500}
-  .fde-btn.ghost:hover{background:#f4f4f5;color:#18181b}
+  .glosa-btn:hover{background:#f4f4f5}
+  .glosa-btn:active{transform:translateY(1px) scale(.985)}
+  .glosa-btn:focus-visible{outline:2px solid #10b981;outline-offset:2px}
+  .glosa-btn[disabled]{opacity:.55;cursor:default;transform:none}
+  .glosa-btn.primary{background:#0b0b0c;color:#fff;border-color:#0b0b0c}
+  .glosa-btn.primary:hover{background:#26262b}
+  .glosa-btn.ghost{border-color:transparent;color:#71717a;font-weight:500}
+  .glosa-btn.ghost:hover{background:#f4f4f5;color:#18181b}
 
-  .fde-status{font-size:12px;color:#71717a;min-height:16px}
-  .fde-status.err{color:#dc2626}
+  .glosa-status{font-size:12px;color:#71717a;min-height:16px}
+  .glosa-status.err{color:#dc2626}
 
   @media (prefers-color-scheme: dark){
-    .fde-panel{color:#f4f4f5;background:#18181b;border-color:rgba(255,255,255,.08);
+    .glosa-panel{color:#f4f4f5;background:#18181b;border-color:rgba(255,255,255,.08);
       box-shadow:0 24px 60px rgba(0,0,0,.5)}
-    .fde-lead{color:#a1a1aa}
-    .fde-badge{background:#27272a;color:#a1a1aa}
-    .fde-badge.hit{background:rgba(22,163,74,.22);color:#4ade80}
-    .fde-btn{background:#27272a;color:#f4f4f5;border-color:rgba(255,255,255,.12)}
-    .fde-btn:hover{background:#323238}
-    .fde-btn.primary{background:#fafafa;color:#0b0b0c;border-color:#fafafa}
-    .fde-btn.primary:hover{background:#e4e4e7}
-    .fde-btn.ghost{background:transparent;color:#a1a1aa;border-color:transparent}
-    .fde-status{color:#a1a1aa}
+    .glosa-lead{color:#a1a1aa}
+    .glosa-badge{background:#27272a;color:#a1a1aa}
+    .glosa-badge.hit{background:rgba(22,163,74,.22);color:#4ade80}
+    .glosa-btn{background:#27272a;color:#f4f4f5;border-color:rgba(255,255,255,.12)}
+    .glosa-btn:hover{background:#323238}
+    .glosa-btn.primary{background:#fafafa;color:#0b0b0c;border-color:#fafafa}
+    .glosa-btn.primary:hover{background:#e4e4e7}
+    .glosa-btn.ghost{background:transparent;color:#a1a1aa;border-color:transparent}
+    .glosa-status{color:#a1a1aa}
   }
   @media (prefers-reduced-motion: reduce){
-    .fde-fab,.fde-panel,.fde-btn{transition:none}
-    .fde-panel{transform:none}
+    .glosa-fab,.glosa-panel,.glosa-btn{transition:none}
+    .glosa-panel{transform:none}
   }
   `;
   const styleEl = document.createElement("style");
@@ -131,48 +130,48 @@
   document.head.appendChild(styleEl);
 
   // ---- DOM ----------------------------------------------------------------
-  const fab = el("button", "fde-fab fde-root");
+  const fab = el("button", "glosa-fab glosa-root");
   fab.type = "button";
   fab.setAttribute("aria-label", "Open Live Translate");
   fab.innerHTML = ICON_LANG;
 
-  const panel = el("div", "fde-panel fde-root");
+  const panel = el("div", "glosa-panel glosa-root");
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-label", "Live Translate");
   panel.innerHTML = `
-    <div class="fde-head">
-      <span class="fde-hicon">${ICON_LANG}</span>
+    <div class="glosa-head">
+      <span class="glosa-hicon">${ICON_LANG}</span>
       <div>
-        <div class="fde-title">Live Translate</div>
-        <div class="fde-sub">English to Mexican Spanish</div>
+        <div class="glosa-title">Live Translate</div>
+        <div class="glosa-sub">English to Mexican Spanish</div>
       </div>
-      <button class="fde-x" type="button" aria-label="Close">${ICON_X}</button>
+      <button class="glosa-x" type="button" aria-label="Close">${ICON_X}</button>
     </div>
-    <div class="fde-body">
-      <p class="fde-lead">Translate this page into Mexican Spanish, then restore it anytime.</p>
-      <div class="fde-badges" id="fde-badges"></div>
-      <button class="fde-btn primary" id="fde-page" type="button">Translate page</button>
-      <button class="fde-btn ghost" id="fde-restore" type="button">Restore page</button>
-      <div class="fde-status" id="fde-status">Backend: ${CONFIG.API_URL}</div>
+    <div class="glosa-body">
+      <p class="glosa-lead">Translate this page into Mexican Spanish, then restore it anytime.</p>
+      <div class="glosa-badges" id="glosa-badges"></div>
+      <button class="glosa-btn primary" id="glosa-page" type="button">Translate page</button>
+      <button class="glosa-btn ghost" id="glosa-restore" type="button">Restore page</button>
+      <div class="glosa-status" id="glosa-status">Backend: ${CONFIG.API_URL}</div>
     </div>`;
 
   document.body.appendChild(fab);
   document.body.appendChild(panel);
 
-  const badges = panel.querySelector("#fde-badges");
-  const statusEl = panel.querySelector("#fde-status");
-  const pageBtn = panel.querySelector("#fde-page");
+  const badges = panel.querySelector("#glosa-badges");
+  const statusEl = panel.querySelector("#glosa-status");
+  const pageBtn = panel.querySelector("#glosa-page");
 
   // ---- events -------------------------------------------------------------
   fab.addEventListener("click", togglePanel);
-  panel.querySelector(".fde-x").addEventListener("click", () => setPanel(false));
+  panel.querySelector(".glosa-x").addEventListener("click", () => setPanel(false));
   pageBtn.addEventListener("click", translatePage);
-  panel.querySelector("#fde-restore").addEventListener("click", restorePage);
+  panel.querySelector("#glosa-restore").addEventListener("click", restorePage);
 
   // Extension popup drives the widget through window events (see extension/content.js)
-  window.addEventListener("FDE_TRANSLATE_PAGE", translatePage);
-  window.addEventListener("FDE_RESTORE_PAGE", restorePage);
-  window.addEventListener("FDE_OPEN", () => setPanel(true));
+  window.addEventListener("GLOSA_TRANSLATE_PAGE", translatePage);
+  window.addEventListener("GLOSA_RESTORE_PAGE", restorePage);
+  window.addEventListener("GLOSA_OPEN", () => setPanel(true));
 
   // ---- actions ------------------------------------------------------------
   function togglePanel() {
@@ -252,7 +251,7 @@
         if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
         const p = node.parentElement;
         if (!p || skip.has(p.tagName)) return NodeFilter.FILTER_REJECT;
-        if (p.closest(".fde-panel,.fde-fab")) return NodeFilter.FILTER_REJECT; // never translate our own UI
+        if (p.closest(".glosa-panel,.glosa-fab")) return NodeFilter.FILTER_REJECT; // never translate our own UI
         return NodeFilter.FILTER_ACCEPT;
       },
     });
@@ -269,7 +268,7 @@
     if (totalMs) badges.appendChild(badge(Math.round(totalMs) + " ms", "mono"));
   }
   function badge(text, kind) {
-    return el("span", "fde-badge" + (kind ? " " + kind : ""), text);
+    return el("span", "glosa-badge" + (kind ? " " + kind : ""), text);
   }
   function setStatus(text, isErr) {
     statusEl.textContent = text;
@@ -277,13 +276,13 @@
   }
   function handleError(err) {
     if (err instanceof NotImplemented) {
-      setStatus(`${err.path} isn't implemented yet — build it in your backend!`, true);
+      setStatus(`Translation service unavailable — ${err.path} is not implemented.`, true);
     } else if (err.message && err.message.startsWith("HTTP")) {
       setStatus(`Backend error (${err.message}). Check your gateway/AI-service logs.`, true);
     } else {
       setStatus(`Can't reach backend at ${CONFIG.API_URL}. Is your Node gateway running?`, true);
     }
-    console.error("[FDE]", err);
+    console.error("[Glosa]", err);
   }
   function el(tag, className, text) {
     const e = document.createElement(tag);
@@ -297,6 +296,6 @@
   }
   NotImplemented.prototype = Object.create(Error.prototype);
 
-  console.log("%c[FDE] Live Translate widget loaded.", "color:#10b981;font-weight:bold");
-  console.log("[FDE] Backend:", CONFIG.API_URL, "· open the button bottom-right.");
+  console.log("%c[Glosa] Live Translate widget loaded.", "color:#10b981;font-weight:bold");
+  console.log("[Glosa] Backend:", CONFIG.API_URL, "· open the button bottom-right.");
 })();

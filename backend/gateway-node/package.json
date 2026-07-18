@@ -1,7 +1,7 @@
 {
-  "name": "fde-live-translate-gateway",
+  "name": "glosa-gateway",
   "version": "1.0.0",
-  "description": "FDE Assignment 1 — Node software backend (gateway) for the Live Translate widget.",
+  "description": "Node/Express gateway (browser-facing backend) for the Glosa Live Translate widget.",
   "type": "commonjs",
   "engines": { "node": ">=18" },
   "scripts": {

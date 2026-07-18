@@ -1,8 +1,7 @@
-# Product Evaluation — Live Translate
+# Product Evaluation — Glosa Live Translate
 
-- **Student:** {{name}}
+- **Author:** {{name}}
 - **Date:** {{date}}
-- **Video demo:** {{video_url}}
 - **LLM provider / model:** {{provider_model}}
 - **Backend target:** {{gateway_url}}
 
@@ -10,7 +9,7 @@
 
 > {{one-paragraph honest verdict: is this shippable to a real user? what's the strongest part, what's the weakest?}}
 
-**Rubric score (from `eval/report.json`):** {{auto_score}} / {{auto_max}} auto (+ {{manual_max}} manual)
+**Automated checks (from `eval/report.json`):** {{auto_score}} / {{auto_max}} passing
 
 ## 1. Performance & cost (from `benchmark/bench.py`)
 
@@ -31,7 +30,7 @@
 - **Coverage gaps:** {{anything left in English}}
 - **Cache on re-translate:** {{hit badge + latency observed}}
 - **Resilience:** {{CSP/console errors/layout breakage; note if a strict-CSP site blocked injection}}
-- **Screenshots:** {{before/after file refs or "attached to submission"}}
+- **Screenshots:** {{before/after file refs}}
 
 ### Sample translations (6–8)
 
@@ -39,7 +38,7 @@
 |---|---|---|---|
 | {{}} | {{}} | {{}} | {{}} |
 
-## 3. Dimension scorecard
+## 3. Dimension assessment
 
 | Dimension | Pass / Partial / Fail | Evidence |
 |---|---|---|

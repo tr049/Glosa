@@ -1,4 +1,4 @@
-/* FDE · Assignment 1 · Extension popup  (PROVIDED) */
+/* Glosa — extension popup */
 const $ = (id) => document.getElementById(id);
 const DEFAULT_URL = "http://localhost:8787";
 

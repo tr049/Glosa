@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
 """
-FDE · Assignment 1 · Rubric eval & submission report  (PROVIDED)
+Glosa — quality & SLA evaluation
 ================================================================
-Runs the automated portion of the rubric against your running backend, captures
-evidence for the human-graded portion, and writes a submission report you turn
-in ALONGSIDE your video demo.
+Runs the automated checks against a running backend, captures evidence for the
+qualitative checks, and writes a human-readable evaluation report.
 
     # with both services running:
-    python eval/eval.py --student "Jane Doe" --video "https://youtu.be/…" \
-        --deploy-url "https://your-gateway.fly.dev"
+    python eval/eval.py --deploy-url "https://your-gateway.fly.dev"
 
 Outputs (next to this script):
-    REPORT.md     ← your scored rubric SCORECARD. The /fde-live-translate-eval
-                    skill folds this into PRODUCT_EVAL.md, which is what you submit.
+    REPORT.md     ← human-readable evaluation report (metrics + evidence).
+                    The /product-eval skill folds this into PRODUCT_EVAL.md.
     report.json   ← machine-readable, same data
 
-`auto` criteria are scored here. `manual` criteria (Mexican-Spanish quality,
-docs) are left for the grader, who uses the captured evidence + your video.
+`auto` criteria are checked here. `manual` criteria (Mexican-Spanish quality,
+docs) are reviewed by hand from the captured evidence.
 Standard library only.
 """
 import argparse
@@ -63,8 +61,6 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--target", default="http://localhost:8787")
     ap.add_argument("--ai", default="http://localhost:8000")
-    ap.add_argument("--student", default="")
-    ap.add_argument("--video", default="")
     ap.add_argument("--deploy-url", default="", help="public Fly.io gateway URL, e.g. https://your-gw.fly.dev")
     args = ap.parse_args()
 
@@ -165,7 +161,7 @@ def main():
     award("service_separation_contract", round(got),
           f"400_on_bad_input={bad_input_ok}, gateway_nests_ai_health={health_nests_ai}")
 
-    # ---- git hygiene (informational, feeds deploy_docs manual score) ----
+    # ---- git hygiene check ----
     try:
         staged = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True).stdout
         bad = [l for l in staged.splitlines() if any(x in l for x in (".env", "node_modules", ".venv", ".db"))]
@@ -176,7 +172,7 @@ def main():
     ev["hygiene_flags"] = bad
     ev["provided_files_changed"] = widget_diff
 
-    # ---- deploy evidence (feeds deploy_docs manual score) ----
+    # ---- deploy evidence ----
     ev["deploy_url"] = args.deploy_url or None
     if args.deploy_url:
         ds, dh = get(args.deploy_url.rstrip("/") + "/health")
@@ -195,9 +191,7 @@ def main():
 
     # ---- write report.json ----
     report = {
-        "assignment": RUBRIC["assignment"],
-        "student": args.student,
-        "video": args.video,
+        "project": RUBRIC["project"],
         "target": args.target,
         "auto_score": auto_got,
         "auto_max": auto_total,
@@ -210,17 +204,15 @@ def main():
 
     # ---- write REPORT.md ----
     md = []
-    md.append(f"# Submission Report — {RUBRIC['assignment']}\n")
-    md.append(f"- **Student:** {args.student or '_(fill in)_'}")
-    md.append(f"- **Video demo:** {args.video or '_(paste your 60–90s demo link)_'}")
+    md.append(f"# {RUBRIC['project']} — Evaluation Report\n")
     md.append(f"- **Backend target:** `{args.target}`")
-    md.append(f"- **Auto-graded score:** **{auto_got} / {auto_total}**  ·  manual portion: {manual_total} pts (grader)\n")
-    md.append("## Rubric\n")
+    md.append(f"- **Automated checks:** **{auto_got} / {auto_total} passed**  ·  {manual_total} pts reviewed manually\n")
+    md.append("## Criteria\n")
     md.append("| Criterion | Type | Points | Result |")
     md.append("|---|---|---|---|")
     for c in RUBRIC["criteria"]:
         sc = scores[c["id"]]
-        result = notes.get(c["id"], "graded from video/evidence") if c["type"] == "auto" else "**grader** — see evidence + video"
+        result = notes.get(c["id"], "see evidence") if c["type"] == "auto" else "manual review — see evidence"
         got = f"{sc}/{c['points']}" if sc is not None else f"—/{c['points']}"
         md.append(f"| {c['label']} | {c['type']} | {got} | {result} |")
     md.append("\n## Evidence\n")
@@ -238,7 +230,7 @@ def main():
     if ev.get("deploy_url"):
         md.append(f"- Deploy: `{ev['deploy_url']}/health` → {'✅ ok' if ev.get('deploy_health_ok') else '❌ UNREACHABLE'}")
     else:
-        md.append("- Deploy: _(no --deploy-url given; grader verifies your Fly.io URL from README/video)_")
+        md.append("- Deploy: _(no --deploy-url given; see README for the live Fly.io URL)_")
     if ev.get("hygiene_flags"):
         md.append(f"- ⚠️ Git hygiene flags (should be empty): `{ev['hygiene_flags']}`")
     if ev.get("provided_files_changed"):
@@ -248,9 +240,9 @@ def main():
     if (HERE / "_bench.json").exists():
         (HERE / "_bench.json").unlink()
 
-    print(f"\nAuto score: {auto_got}/{auto_total}  (+ {manual_total} manual pts from grader)")
-    print(f"Wrote {HERE/'REPORT.md'} (your scorecard) and {HERE/'report.json'}.")
-    print("Run /fde-live-translate-eval to fold this into PRODUCT_EVAL.md — that's your submission.\n")
+    print(f"\nAutomated checks: {auto_got}/{auto_total} passed  (+ {manual_total} pts reviewed manually)")
+    print(f"Wrote {HERE/'REPORT.md'} and {HERE/'report.json'}.")
+    print("Run /product-eval to fold this into PRODUCT_EVAL.md.\n")
     return 0
 
 

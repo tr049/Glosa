@@ -11,8 +11,8 @@ One job: turn an English string into Mexican Spanish using an LLM.
 
 FAIL LOUD: we do NOT wrap the call in a try/except that returns `text` on error.
 Any provider / SDK / schema-validation error propagates so the caller returns a
-502. Silently serving the untranslated English while looking healthy is an
-automatic fail on this assignment (and a real shipped bug).
+502. Silently serving the untranslated English while looking healthy is a real
+shipped bug this service refuses to allow.
 """
 from __future__ import annotations
 

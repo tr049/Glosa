@@ -1,6 +1,6 @@
 {
-  "_comment": "Measurable rubric for FDE Assignment 1. `auto` items are scored by eval.py; `manual` items are scored by a human/grader using the captured evidence + the video demo. Total = 100.",
-  "assignment": "Assignment 1 — Live Translate",
+  "_comment": "Measurable quality criteria for Glosa. `auto` items are checked by eval.py; `manual` items are reviewed by hand using the captured evidence.",
+  "project": "Glosa — Live Translate",
   "total_points": 100,
   "criteria": [
     {
@@ -43,7 +43,7 @@
       "label": "LLM & prompt quality (natural Mexican Spanish)",
       "points": 20,
       "type": "manual",
-      "check": "grader judges the captured sample translations + video: es-MX register, translation only, numbers/prices/codes preserved"
+      "check": "manual review of captured sample translations: es-MX register, translation only, numbers/prices/codes preserved"
     },
     {
       "id": "deploy_docs",

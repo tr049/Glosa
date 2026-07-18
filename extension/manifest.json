@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "FDE Live Translate (EN → Mexican Spanish)",
+  "name": "Glosa — Live Translate (EN → Mexican Spanish)",
   "version": "1.0.0",
-  "description": "Assignment 1 widget: live, on-demand English→Mexican-Spanish translation on any page.",
+  "description": "Live, on-demand English → Mexican Spanish translation for any web page.",
   "permissions": ["activeTab", "storage", "scripting"],
   "host_permissions": ["http://localhost:8787/*", "<all_urls>"],
   "content_scripts": [

@@ -1,59 +1,61 @@
+# Glosa — Live Translate
 
-# Assignment 1 — Live Translate
+> A browser widget that translates any English web page into **Mexican Spanish**
+> in real time and on demand — backed by a two-service LLM API with a two-tier cache.
 
-> Ship a browser widget that translates any English web page into **Mexican
-> Spanish** in real time and on demand — then build the backend that powers it.
+Glosa drops a floating **Translate** button onto any page. Click **Translate
+page** and the whole page flips to natural Mexican Spanish; click **Restore** to
+bring the English back. It ships three ways off one widget — a Chrome extension,
+a DevTools console snippet, and a gateway-served `<script>` — and it works on
+real, third-party sites it doesn't control (homedepot.com, GitHub, Google).
 
-You are given a **working frontend** (a widget, a console loader, and a Chrome
-extension). Your job is to build the **backend** it talks to. When your backend
-works, the widget lights up on any page on the internet. That's the whole game.
+Behind the widget are two independently-deployable services: a **Node gateway**
+(browser-facing: CORS, validation, logging, request tracing) and a **Python AI
+service** (the LLM call, a two-tier cache, and structured logs). API keys never
+touch the browser edge.
 
-This is the first assignment of the **Forward Deployed Engineer (FDE)** track.
-It's deliberately shaped like real FDE work: you don't get a clean sandbox, you
-get *someone else's page* and a widget you have to make useful by standing up a
-real service behind it — with an LLM, a cache, logs, and a deploy.
+## Highlights
 
----
+- **Real LLM translation** into es-MX (Mexican Spanish) — natural register, not generic Spanish; numbers, prices, and product/SKU codes preserved verbatim.
+- **Two-tier cache** (in-memory + SQLite, SHA-256 keyed) — identical text never hits the LLM twice; a cache hit is **~300× faster** than a miss and the SQLite tier survives a restart.
+- **Fail-loud by design** — a provider error surfaces as `502`; the service never serves untranslated English as if it succeeded.
+- **Observable** — one structured JSON log line per request/translation, correlated end-to-end across both services by a single `X-Request-Id`.
+- **Proven, not eyeballed** — a standard-library benchmark enforces an SLA and exits non-zero on breach (usable as a CI gate).
+- **Deployed** — both services run on Fly.io; the gateway is public, the AI service private over `flycast`.
 
-## Why this assignment
+### Measured performance (end-to-end through the deployed gateway)
 
-A Forward Deployed Engineer takes a capability and makes it work **in the
-customer's environment**, end to end. This assignment compresses that into one
-afternoon:
+| Metric | Result | SLA |
+|---|---|---|
+| Cache hit p95 | **7.6 ms** | ≤ 60 ms |
+| Cache miss p95 | **2969 ms** | ≤ 3500 ms |
+| Cache hit rate | **77.5 %** | ≥ 60 % |
+| Throughput | **1622 req/s** | ≥ 20 |
+| Error rate | **0.0 %** | ≤ 1 % |
 
-- **Ship into an environment you don't control** — the browser, on pages you didn't write.
-- **Own a service** — an LLM-backed API with caching, logging, and a health check.
-- **Respect a contract** — a fixed API the frontend already speaks. You conform to it; you don't get to change it.
-- **Separate concerns** — an app/gateway layer vs. an AI layer, talking over HTTP.
-- **Make it observable** — prove your cache works with latency and hit-rate, not vibes.
-- **Deploy it** — at minimum, run the whole thing locally with one command per service.
-
----
+Full write-up in [`PRODUCT_EVAL.md`](PRODUCT_EVAL.md).
 
 ## Architecture
 
-Three moving parts. The **frontend is done**. You build the **two backend services**.
+Three moving parts: a browser frontend and two backend services.
 
 ```
    ┌─────────────────────────┐
    │  Browser (any web page) │
    │  ┌───────────────────┐  │
-   │  │  🌐 Widget         │  │   ← PROVIDED, working
+   │  │  🌐 Widget         │  │   ← MV3 extension / console loader / <script>
    │  │  (or extension)   │  │
    │  └─────────┬─────────┘  │
    └────────────┼────────────┘
                 │  POST /translate           (JSON over HTTP, CORS)
                 ▼
    ┌─────────────────────────┐
-   │  Node Gateway  :8787     │   ← YOU (software backend) — ~2 TODOs
-   │  CORS · validate · log  │
-   │  serve widget · proxy   │
+   │  Node Gateway  :8787     │   ← CORS · validate · log · trace · serve widget · proxy
    └────────────┬────────────┘
                 │  POST /translate
                 ▼
    ┌─────────────────────────┐
-   │  Python AI Service :8000 │   ← YOU (AI backend) — the real work
-   │  LLM · cache · AI logs  │
+   │  Python AI Service :8000 │   ← LLM · two-tier cache · structured logs
    └────────────┬────────────┘
                 │
        ┌────────┴────────┐
@@ -63,32 +65,27 @@ Three moving parts. The **frontend is done**. You build the **two backend servic
 
 **Why two services?** The browser-facing concerns (CORS, validation, serving
 assets, rate limiting, request logs) are genuinely different from the AI
-concerns (prompts, model choice, caching, API keys). Splitting them is the FDE
-habit: each deploys and fails independently, and your API keys never live on
-the edge the browser can reach.
+concerns (prompts, model choice, caching, API keys). Splitting them means each
+service deploys and fails independently, and API keys never live on a
+browser-reachable edge.
 
----
+## Repository layout
 
-## What's provided vs. what you build
+| Component | Path |
+|-----------|------|
+| Translation widget | `widget/translation-widget.js` |
+| Console loader | `loader/console-snippet.js` |
+| Chrome extension (MV3) | `extension/` |
+| Demo page | `demo-pages/index.html` |
+| Node gateway | `backend/gateway-node/` |
+| Python AI service | `backend/ai-service-python/` |
+| Benchmark & SLA gate | `benchmark/` |
+| Quality evaluation | `eval/`, `PRODUCT_EVAL.md` |
 
-| Component | Status | Path |
-|-----------|--------|------|
-| Translation widget | ✅ Provided, working | `widget/translation-widget.js` |
-| Console loader | ✅ Provided | `loader/console-snippet.js` |
-| Chrome extension (MV3) | ✅ Provided | `extension/` |
-| Demo page to test on | ✅ Provided | `demo-pages/index.html` |
-| **Node gateway** | 🔨 **You** — 2 TODOs | `backend/gateway-node/` |
-| **Python AI service** | 🔨 **You** — the core | `backend/ai-service-python/` |
+## The API contract
 
-You should not need to edit the widget. Read it to understand the contract, then
-build a backend that satisfies it.
-
----
-
-## The API contract (do not change it)
-
-The widget speaks this to the **Node gateway**, and the gateway forwards the
-same shapes to the **Python AI service**.
+The widget speaks this to the **Node gateway**, which forwards the same shapes to
+the **Python AI service**.
 
 ### `POST /translate`
 ```jsonc
@@ -116,127 +113,68 @@ same shapes to the **Python AI service**.
 { "requests": 40, "memory_hits": 22, "db_hits": 6, "misses": 12, "hit_rate_pct": 70.0 }
 ```
 
-**Contract rules that matter:**
-- `cached` must be **true** when the answer came from your cache (no LLM call).
-- `latencyMs` must be measured on the server for both paths — a cache hit should be *dramatically* faster than a miss. That gap is the point.
-- Identical `(text, target)` must **never** hit the LLM twice.
+**Contract invariants:**
+- `cached` is **true** only when the answer came from cache (no LLM call).
+- `latencyMs` is measured server-side on both paths — a cache hit is *dramatically* faster than a miss.
+- Identical `(text, target)` never hits the LLM twice.
 - Errors return a JSON body and a sensible status (`400` bad input, `502` upstream failure, `501` not-implemented).
 
----
+## Running it locally
 
-## Build it — recommended order
+Two services, two terminals. Start the AI service first (it can be tested with
+`curl`, no browser needed), then the gateway, then load the widget.
 
-Build the AI service first (you can test it with `curl`, no browser needed),
-then the gateway, then load the widget.
-
-### Part 1 — Python AI service (the real work)
-`backend/ai-service-python/` · full guide in its own README.
-
-1. `lib/llm.py` — write the Mexican-Spanish prompt and the LLM call.
-2. `lib/cache.py` — implement the SQLite tier (`init` / `get` / `set`); the memory tier and stats are given.
-3. `app.py` — wire the **cache→LLM→cache** flow in `translate_one()`.
-
+### Python AI service
 ```bash
 cd backend/ai-service-python
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # add your API key
-uvicorn app:app --reload --port 8000
+cp .env.example .env            # add ANTHROPIC_API_KEY (and optionally MODEL=claude-sonnet-5)
+uvicorn app:app --port 8000
 ```
-
 Test it in isolation:
 ```bash
 curl -s localhost:8000/translate -H 'content-type: application/json' \
   -d '{"text":"Good morning, welcome!","target":"es-MX"}'   # run twice → 2nd is cached
 ```
 
-### Part 2 — Node gateway (software backend)
-`backend/gateway-node/` · two TODOs in `server.js`.
-
-1. Request-logging middleware (method, url, status, ms).
-2. `callAiService()` — proxy to the Python service.
-
+### Node gateway
 ```bash
 cd backend/gateway-node
 npm install
-cp .env.example .env
-npm start                   # http://localhost:8787
+cp .env.example .env            # AI_SERVICE_URL defaults to http://localhost:8000
+npm start                       # http://localhost:8787
 ```
 
-### Part 3 — see it live
+### Load the widget in the browser
+- **Extension (recommended — required for real sites):** `chrome://extensions` → enable Developer mode → *Load unpacked* → select `extension/`. Its content script injects the widget on every page and its background worker proxies to the gateway, so it works even on strict-CSP sites. Set the backend URL in the popup.
+- **Console (quick, permissive pages only):** open a page → DevTools → Console → paste `loader/console-snippet.js`. Strict-CSP sites block this — use the extension there.
+- **Demo page:** open `demo-pages/index.html` and uncomment the `<script src=".../widget.js">` line at the bottom.
 
-- **Extension (recommended — required for real sites):** `chrome://extensions` → enable
-  Developer mode → *Load unpacked* → select the `extension/` folder. Its content script
-  **injects the widget onto every page** and its background worker proxies to your gateway,
-  so it works even on strict-CSP sites (homedepot.com, google, github). Use the popup to set
-  the backend URL. **This is the widget — the extension is just how it gets onto the page.**
-- **Console (quick one-off, permissive pages only):** open a page → DevTools → Console →
-  paste `loader/console-snippet.js`. Note: strict-CSP sites will block this — that's why the
-  live-website test uses the extension.
-- **Demo page:** open `demo-pages/index.html`, uncomment the `<script src=".../widget.js">` line at the bottom.
+Open the **Translate** button (bottom-right) → **Translate page** → the whole
+page flips to Mexican Spanish. Click **Restore page**, then **Translate page**
+again → the badges show **cache hits** and the latency drops.
 
-Open the **translate button** bottom-right and click **Translate page** → the
-whole page flips to Mexican Spanish. Click **Restore page**, then **Translate
-page** again → the badges show **cache hits** and the latency drops.
+> The extension bundles its own copy of the widget at
+> `extension/translation-widget.js`, kept byte-identical to `widget/translation-widget.js`.
 
-> Note: the extension loads its own copy of the widget at
-> `extension/translation-widget.js`. If you change the widget, re-copy it
-> (`cp widget/translation-widget.js extension/`).
+## Performance, SLA & cost
 
-### Part 4 — ship it on Fly.io
-
-Localhost proves it runs; a deploy proves it's a product. Put **both** services on
-[Fly.io](https://fly.io) and point the extension at the public gateway.
-
-```bash
-# one app per service (run in each backend dir)
-cd backend/ai-service-python && fly launch --no-deploy   # set secrets, then:
-fly secrets set ANTHROPIC_API_KEY=...                     # or your provider's key — never bake it into the image
-fly deploy
-
-cd ../gateway-node && fly launch --no-deploy
-fly secrets set AI_SERVICE_URL=https://<your-ai-app>.fly.dev
-fly deploy
-```
-
-Then set the gateway's public URL (`https://<your-gateway-app>.fly.dev`) in the extension
-popup. Your **live-website test must pass against the deployed gateway**, not localhost.
-
-> Keep the AI service private if you can (Fly private networking / `flycast`) so only the
-> gateway can reach it — the browser should only ever touch the gateway.
-
----
-
-## Performance, SLAs & cost
-
-A translation that's correct but slow or expensive fails in production. Your
-backend must meet the SLA in `benchmark/sla.json`, and you **prove it with the
-provided benchmark** — no eyeballing.
-
-### The SLA (targets you must hit)
+A translation that's correct but slow or expensive fails in production. Glosa
+meets the SLA in [`benchmark/sla.json`](benchmark/sla.json), verified by the
+benchmark — measured, not eyeballed.
 
 | Metric | Target | Why it matters |
 |--------|--------|----------------|
 | Cache **hit** latency, p95 | ≤ 60 ms | a cache hit should feel instant |
 | Cache **miss** latency, p95 | ≤ 3500 ms | one LLM round-trip, end to end |
-| **Cache hit rate** (benchmark workload) | ≥ 60 % | repeated text must be served from cache |
+| **Cache hit rate** | ≥ 60 % | repeated text served from cache |
 | Error rate | ≤ 1 % | reliability under concurrency |
 | Warm **throughput** | ≥ 20 req/s | translate a page's worth of chunks fast |
 
-### Cost & time-to-value
-
 Every **cache miss** costs an LLM call; every **hit** is effectively free — so
-your hit rate is a direct lever on cost. `bench.py` reports:
-
-- **latency percentiles** (your "time to translate") and **throughput**
-- **cost per miss** (token estimate × your provider's price)
-- **monthly cost with vs. without cache** at the volume in `sla.json`, and the **savings**
-
-> The prices in `sla.json` are **placeholders**. Set `input_usd_per_mtok` /
-> `output_usd_per_mtok` to your provider's current published rates before you
-> trust the dollar figures.
-
-### Run the benchmark
+the hit rate is a direct lever on cost. `bench.py` reports latency percentiles,
+throughput, cost per miss, and projected monthly cost with vs. without the cache.
 
 ```bash
 # with both services running:
@@ -245,217 +183,73 @@ python benchmark/bench.py --direct         # straight to the AI service (:8000)
 python benchmark/bench.py --json out.json  # also write machine-readable results
 ```
 
-`bench.py` **exits non-zero if any SLA fails**, so it doubles as your grading
-gate and a CI check.
+`bench.py` **exits non-zero if any SLA fails**, so it doubles as a CI gate.
 
----
+## Deploy
 
-## Requirements checklist
+Both services run on [Fly.io](https://fly.io) — the gateway public, the AI
+service private over `flycast` so only the gateway can reach it. Full runbook in
+[`DEPLOY.md`](DEPLOY.md):
 
-Your backend must:
-
-- [ ] **LLM** — translate EN → **Mexican Spanish** (es-MX register, not generic Spanish) via a real LLM call.
-- [ ] **Caching** — two-tier (in-memory + SQLite), keyed by a hash of `(text, target)`; identical input never calls the LLM twice; `cached`/`latencyMs`/`/stats` reflect it.
-- [ ] **Logging** — one structured line per request in the gateway **and** per translation in the AI service; greppable.
-- [ ] **Tracing** — a request ID at the gateway (reusing an inbound `X-Request-Id` if present, else generated), forwarded to the AI service, and logged by both; one request is greppable end-to-end across both services by that single ID.
-- [ ] **Performance** — meets every SLA in `benchmark/sla.json`; `python benchmark/bench.py` exits `0`.
-- [ ] **Runs locally** — each service starts with a single documented command; secrets come from `.env` (never committed).
-- [ ] **Deployed on Fly.io** — both services deployed; the extension works against the public gateway URL, not just localhost.
-- [ ] **Contract** — every endpoint matches the shapes above; the provided widget works unmodified.
-- [ ] **Product evaluation** — a `PRODUCT_EVAL.md` (or PDF) generated by the `/fde-live-translate-eval` skill, including a live-website test on a real site you don't control (e.g. homedepot.com), submitted with your video.
-
----
-
-## Definition of Done — non-negotiables
-
-> **This section is written for your coding agent.** The same list lives in
-> [`AGENTS.md`](AGENTS.md), which Claude Code and most agent harnesses read
-> automatically. Treat every box as a hard requirement and **self-verify each
-> one** with the commands at the bottom before claiming the work is done. Do not
-> mark a box checked from inspection alone — run the check.
-
-**Contract (must match exactly)**
-- [ ] `POST /translate` → `{ "translated": string, "cached": boolean, "latencyMs": number, "model": string }`
-- [ ] `POST /translate/batch` → `{ "results": [{ "translated": string, "cached": boolean }], "latencyMs": number }`
-- [ ] `GET /health` → `{ "status": "ok", ... }` and `GET /stats` → cache stats incl. a hit rate
-- [ ] Status codes: `400` invalid input, `501` not implemented, `502` upstream failure
-- [ ] The provided widget works **unmodified** against the gateway at `:8787`
-
-**LLM**
-- [ ] Output is natural **Mexican Spanish (es-MX)**, translation only — no preamble, no wrapping quotes
-- [ ] Numbers, prices (`$`), and product/model codes are preserved
-- [ ] Provider is swappable via env; the API key is read from `.env`, never hard-coded
-- [ ] **Errors surface, never swallowed** — on a provider/LLM failure the request returns `502` and the error is logged; the service **never returns the untranslated input as if it succeeded** (a silent "return the original text" fallback is an automatic fail)
-
-**Caching (hard)**
-- [ ] Identical `(text, target)` **never** calls the LLM twice
-- [ ] `cached: true` appears **only** when the response came from cache
-- [ ] Two tiers — in-memory **and** SQLite; the SQLite cache **survives a restart**
-- [ ] Cache key is a hash of `(text, target)`
-
-**Logging & tracing**
-- [ ] Gateway logs one structured line per request: method, url, status, duration (ms)
-- [ ] AI service logs one structured line per translation: cached, latencyMs, chars
-- [ ] A request ID is set at the gateway (inbound `X-Request-Id` reused if present, else generated), forwarded to the AI service, and logged by both — one request is greppable end-to-end across both services by that single ID
-
-**Performance (SLA gate)**
-- [ ] `python benchmark/bench.py` exits `0` — every SLA in `benchmark/sla.json` passes
-
-**Deploy**
-- [ ] Each service starts locally with a single documented command
-- [ ] Both services are deployed to Fly.io and the extension works against the public gateway URL
-
-**Hygiene**
-- [ ] `.env`, `node_modules/`, `.venv/`, `*.db`, `*.log` are git-ignored and NOT committed
-
-**Self-verify (run all of these; all must pass)**
 ```bash
-# 1. both services up
-curl -sf localhost:8000/health && curl -sf localhost:8787/health
+# AI service (private)
+cd backend/ai-service-python && fly launch --no-deploy
+fly secrets set ANTHROPIC_API_KEY=...        # never baked into the image
+fly deploy
 
-# 2. contract + cache: run twice — 2nd response must have "cached": true and a much lower latencyMs
-curl -s localhost:8787/translate -H 'content-type: application/json' -d '{"text":"Good morning","target":"es-MX"}'
-curl -s localhost:8787/translate -H 'content-type: application/json' -d '{"text":"Good morning","target":"es-MX"}'
-
-# 3. cache survives restart: stop + restart the AI service, repeat the call above → still "cached": true
-
-# 4. SLA gate — must exit 0
-python benchmark/bench.py
-
-# 5. no secrets / junk staged
-git status --porcelain | grep -E '\.env$|node_modules|\.venv|\.db$' && echo "FAIL: unstage these" || echo "clean"
-
-# 6. trace correlation: grab a request's id from the gateway log, then confirm it in BOTH logs
-grep "<request-id>" gateway.log ai-service.log     # must appear in both services
-
-# 7. deployed for real: the public Fly.io gateway answers
-curl -sf https://<your-gateway-app>.fly.dev/health
+# Gateway (public) — built from the repo root so it can serve widget/
+cd .. && fly launch --no-deploy --config backend/gateway-node/fly.toml
+fly secrets set AI_SERVICE_URL=http://<your-ai-app>.flycast
+fly deploy --config backend/gateway-node/fly.toml .
 ```
 
----
+Point the extension popup at the public gateway URL and translate a real site.
 
-## Grading (100 pts)
+## Feature checklist
 
-| Area | Pts | What we look for |
-|------|-----|------------------|
-| Widget lights up | 15 | Fresh clone → follow README → Translate page works end to end on the demo page and a real site |
-| LLM & prompt quality | 20 | Natural Mexican Spanish; numbers/prices/model codes preserved; translation only (no preamble) |
-| Caching correctness | 20 | Real two-tier cache; provable hits; big latency gap; survives a restart (SQLite) |
-| Performance & SLA | 15 | `benchmark/bench.py` exits 0; hit/miss latency, hit rate, throughput all meet `sla.json` |
-| Logging & observability | 10 | Structured, useful logs; a request ID correlates one request across both services; accurate `/stats`; `/health` reports the AI service |
-| Service separation & contract | 10 | Clean gateway↔AI split; correct status codes; graceful errors |
-| Deploy & docs | 10 | Both services deployed on Fly.io and reachable via the public gateway; one-command local run; clear `.env.example`; your own short run notes |
+Glosa's backend:
 
-### Sample scorecard
+- [x] **LLM** — translates EN → **Mexican Spanish** (es-MX register) via a real LLM call.
+- [x] **Caching** — two-tier (in-memory + SQLite), keyed by a hash of `(text, target)`; identical input never calls the LLM twice.
+- [x] **Logging** — one structured line per request in the gateway and per translation in the AI service.
+- [x] **Tracing** — an `X-Request-Id` set at the gateway (reusing an inbound header if present), forwarded to the AI service, logged by both; one request is greppable end-to-end.
+- [x] **Performance** — meets every SLA in `benchmark/sla.json`; `python benchmark/bench.py` exits `0`.
+- [x] **Runs locally** — each service starts with one documented command; secrets come from `.env`.
+- [x] **Deployed on Fly.io** — both services deployed; the extension works against the public gateway URL.
+- [x] **Contract** — every endpoint matches the shapes above; the widget works unmodified.
 
-This is what a strong submission looks like — the scored rubric your `PRODUCT_EVAL.md`
-captures. **Illustrative only**; your numbers must come from your own run (fabricating
-them is an automatic fail).
-
-> **Assignment 1 — Live Translate · Jordan Lee · 93 / 100**
-
-| Criterion | Pts | Awarded | Status | Evidence |
-|-----------|-----|---------|--------|----------|
-| Widget lights up | 15 | 15 | ✅ Pass | `/translate` + `/translate/batch` return valid shapes; page flips to es-MX live on homedepot.com |
-| Caching correctness | 20 | 20 | ✅ Pass | 2nd identical call `cached: true`, **3 ms vs 812 ms**; `translations.db` has 214 rows; survives restart |
-| Performance & SLA | 15 | 15 | ✅ Pass | `bench.py` exits 0 — hit p95 4 ms, miss p95 2.9 s, hit rate 71%, 34 req/s |
-| Logging & observability | 10 | 10 | ✅ Pass | Structured lines in both services; one trace id correlates a request end-to-end; `/stats` hit rate accurate |
-| Service separation & contract | 10 | 10 | ✅ Pass | Clean gateway↔AI split; `400` on empty text; gateway `/health` nests AI-service health |
-| LLM & prompt quality | 20 | 17 | ⚠️ Partial | Natural es-MX, translation-only; `$1,299.00` and `SKU-4471` preserved; one idiom rendered a little stiff |
-| Deploy & docs | 10 | 6 | ⚠️ Partial | Deployed on Fly.io, public gateway healthy; run notes present; AI service left publicly reachable (no `flycast`) |
-| **Total** | **100** | **93** | | Auto: 70/70 · Manual: 23/30 |
-
-**Red-line checks (auto-flagged):** ✅ no secrets committed · ✅ no edits to provided `widget/` · `extension/` · `benchmark/`
-
-**Captured evidence (excerpt)**
-- Samples: *"Good morning, welcome!"* → *"¡Buenos días, bienvenido!"* · *"Add to cart"* → *"Agregar al carrito"*
-- Latency: miss p95 **2.9 s** · hit p95 **4 ms** (~700× faster on a cache hit)
-- Cost: ~$0.0004 / miss · at 71% hit rate, projected monthly bill is ~⅓ of no-cache
-- Deploy: `https://jordan-livetranslate-gw.fly.dev/health` → `{"status":"ok"}`
-
-Read your `eval/REPORT.md` the same way: fix any **Fail/Partial** rows before you record the demo.
-
----
-
-## Stretch goals (bonus)
-
-- **Dockerize** both services + a `docker-compose.yml` so `docker compose up` runs everything.
-- **Harden the deploy** — multi-region on Fly.io, autoscale (`fly autoscale`), a health-check-driven restart policy, and a GitHub Action that runs `bench.py` and `fly deploy` on green.
-- **Rate limiting** on the gateway (per-IP) with a `429` + friendly widget message.
-- **Streaming** long translations token-by-token into the widget.
-- **Cache TTL / invalidation** and a `POST /clear-cache` endpoint.
-- **Language picker** in the widget/popup (es-MX, es-ES, pt-BR…) threaded through the contract.
-
----
-
-## Submit
-
-Every FDE project is submitted as a **Product Evaluation + a video demo**.
-
-1. **Generate the evaluation with the skill.** In Claude Code, run
-   **`/fde-live-translate-eval`** (bundled in `.claude/skills/`). It runs the
-   automated rubric + benchmark, performs a **live-website test on a real site you
-   don't control (default homedepot.com)**, and writes **`PRODUCT_EVAL.md`** at the
-   assignment root. Export a **PDF** if you prefer (`md-to-pdf` skill or `pandoc`).
-   - Under the hood it runs `python eval/eval.py --student "…" --video "…"` and
-     `python benchmark/bench.py` — you can run those directly too. See [`eval/`](eval/).
-2. **Submit `PRODUCT_EVAL.md` (or the PDF)** and a **60–90s screen recording**:
-   the widget translating a real page into Mexican Spanish, then a cache hit shown in the badges.
-3. Push your repo with both `backend/` services implemented. Do **not** commit
-   `.env`, `node_modules/`, `.venv/`, or `*.db`. Add a short **"How I ran it"**
-   section to your README noting which LLM provider you used.
-
----
-
-## How I ran it
+## Configuration & providers
 
 **LLM provider:** Anthropic. **Model:** `claude-sonnet-5` (set via `MODEL` in
-`backend/ai-service-python/.env`, which overrides the code default
-`claude-sonnet-4-6`). Translations use structured output (the reply is validated
-into a Pydantic model) with the es-MX prompt rendered per-locale from
-`lib/prompts.yaml`. The API key is read from `.env` and never committed.
-
-**Run locally (two terminals).** Start each service from its own directory so
-`translations.db` and `ai-service.log` resolve where the tooling expects them:
-
-```bash
-# Terminal 1 — Python AI service (:8000)
-cd backend/ai-service-python
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env            # add ANTHROPIC_API_KEY (and optionally MODEL=claude-sonnet-5)
-uvicorn app:app --port 8000
-
-# Terminal 2 — Node gateway (:8787)
-cd backend/gateway-node
-npm install
-cp .env.example .env            # AI_SERVICE_URL defaults to http://localhost:8000
-npm start
-```
+`backend/ai-service-python/.env`, overriding the code default `claude-sonnet-4-6`).
+Translations use structured output — the reply is validated into a Pydantic model —
+with the es-MX prompt rendered per-locale from `lib/prompts.yaml`. The provider is
+swappable; the API key is read from `.env` and never committed.
 
 The gateway writes one structured JSON line per request to `gateway.log`; the AI
-service writes one per translation to `ai-service.log`. An `X-Request-Id`
-(reused from the inbound header or generated) is forwarded from gateway → AI
-service and logged by both, so a single request is greppable end-to-end:
+service writes one per translation to `ai-service.log`. An `X-Request-Id` is
+forwarded gateway → AI service and logged by both, so a single request is
+greppable end-to-end:
 
 ```bash
 grep "<request-id>" backend/gateway-node/gateway.log backend/ai-service-python/ai-service.log
 ```
 
-**Benchmark (verified locally, end-to-end through the gateway):** `python
-benchmark/bench.py` exits `0` — cache **hit p95 9 ms**, **miss p95 2298 ms**
-(~256× speedup), **hit rate 76.2%**, **0% errors**, throughput well above the
-20 req/s target.
+## Roadmap
 
-> The cost figures in `sla.json` use placeholder prices tagged
-> `claude-sonnet-4-6`; set `cost_model` to Sonnet 5's published rates before
-> trusting the dollar amounts. The latency / hit-rate / throughput SLAs are
-> real and independent of those prices.
+- **Dockerize** with a `docker-compose.yml` so `docker compose up` runs everything.
+- **Rate limiting** on the gateway (per-IP) with a `429` + friendly widget message.
+- **Streaming** long translations token-by-token into the widget.
+- **Cache TTL / invalidation** and a `POST /clear-cache` endpoint.
+- **Language picker** in the widget/popup (es-MX, es-ES, pt-BR…) threaded through the contract — the prompt library already ships config for 10 locales.
 
 ## Troubleshooting
 
-- **Widget shows "Can't reach backend"** → the Node gateway isn't running, or the widget's `API_URL` doesn't match. Set it in the extension popup, or `window.FDE_CONFIG = { API_URL: "..." }` before pasting the console snippet.
-- **"endpoint isn't implemented yet"** → expected until you finish the TODOs. That message *is* your progress bar.
+- **Widget shows "Can't reach backend"** → the Node gateway isn't running, or the widget's `API_URL` doesn't match. Set it in the extension popup, or `window.GLOSA_CONFIG = { API_URL: "..." }` before pasting the console snippet.
 - **CORS errors** → the gateway enables CORS for all origins in dev; make sure requests go to the gateway (`:8787`), not the AI service (`:8000`).
-- **macOS port 5000 is taken** → that's AirPlay Receiver. We use `8787`/`8000` on purpose; keep them.
-- **Extension didn't update after a code change** → re-copy the widget into `extension/` and hit *Reload* on `chrome://extensions`.
+- **macOS port 5000 is taken** → that's AirPlay Receiver. Glosa uses `8787`/`8000` on purpose.
+- **Extension didn't update after a code change** → the extension bundles its own copy of the widget; re-copy it (`cp widget/translation-widget.js extension/`) and hit *Reload* on `chrome://extensions`.
+
+## License
+
+MIT © 2026 Taimoor Raza — see [`LICENSE.md`](LICENSE.md).

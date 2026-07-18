@@ -3,13 +3,11 @@ lib/cache.py — two-tier cache: memory + SQLite
 =====================================================================
 Why two tiers?
   - MEMORY (dict): instant, but lost on restart.
-  - SQLite (disk): survives restarts, and is where you can inspect what your
-    service has learned. Check memory first, then disk, then LLM.
+  - SQLite (disk): survives restarts, and is where the service's learned
+    translations can be inspected. Check memory first, then disk, then LLM.
 
-The cache key must be deterministic for the same (text, target). Hashing the
-input with sha256 gives you a compact, collision-safe key.
-
-Fill in the TODOs. The method signatures and stats are laid out for you.
+The cache key is deterministic for the same (text, target): hashing the
+input with sha256 gives a compact, collision-safe key.
 """
 import hashlib
 

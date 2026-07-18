@@ -50,8 +50,8 @@ Now the AI service is reachable **only** from inside your Fly org at
 `http://glosa-ai.flycast`.
 
 > Quick fallback if flycast gives you trouble: skip the three `fly ips` lines and
-> leave the service public at `https://glosa-ai.fly.dev`. It works, but the rubric
-> prefers keeping the AI service private.
+> leave the service public at `https://glosa-ai.fly.dev`. It works, but best
+> practice is to keep the AI service private.
 
 ---
 
@@ -107,7 +107,7 @@ fly logs -a glosa-ai      | grep deploytest-123
 ```
 
 > On Fly, logs go to the platform log stream (`fly logs`), not to files — the
-> `gateway.log`/`ai-service.log` files are for local grading. The same request id
+> `gateway.log`/`ai-service.log` files are for local development/inspection. The same request id
 > still appears in both apps' streams.
 
 ---
@@ -118,8 +118,8 @@ fly logs -a glosa-ai      | grep deploytest-123
 2. Open the extension **popup** → set the backend URL to
    `https://glosa-gateway.fly.dev`
 3. Visit a real site you don't control (e.g. **homedepot.com**) → open the
-   widget → **Translate page**. This is your graded live-website test — it must
-   pass against the **deployed** gateway, not localhost.
+   widget → **Translate page**. This is the live-website test — it must pass
+   against the **deployed** gateway, not localhost.
 
 ---
 

@@ -1,0 +1,9 @@
+[project]
+name = "glosa"
+version = "0.1.0"
+description = "Live web-page translation (English → Mexican Spanish): a browser widget + MV3 extension backed by a Node gateway and a Python FastAPI AI service with a two-tier cache."
+requires-python = ">=3.14"
+license = { file = "LICENSE.md" }
+authors = [{ name = "Taimoor Raza", email = "taimoor.raza7@gmail.com" }]
+readme = "README.md"
+dependencies = []

@@ -1,15 +1,12 @@
 /*
- * FDE · Assignment 1 · Node Gateway  (the "software backend")
- * ==========================================================
- * This is the ONLY server the browser widget talks to. Its jobs:
+ * Glosa — Node Gateway (the browser-facing "software backend")
+ * ===========================================================
+ * The ONLY server the browser widget talks to. Its jobs:
  *   - serve the widget file at /widget.js
  *   - accept translation requests from the widget (CORS, validation)
  *   - forward them to the Python AI service
  *   - expose /health and /stats
- *   - log every request
- *
- * It is ~90% done
- * Everything else works out of the box.
+ *   - log every request with a correlated X-Request-Id
  *
  * Run:  npm install && npm start      (needs Node 18+ for global fetch)
  */
@@ -25,9 +22,9 @@ const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 const WIDGET_PATH = path.join(__dirname, "..", "..", "widget", "translation-widget.js");
 
 // --- structured logging --------------------------------------------------
-// Write one JSON line per event to BOTH stdout and gateway.log. Writing to a
-// real file (not just console) is required: the grader greps this file for the
-// X-Request-Id, and `npm start` does not pipe stdout anywhere.
+// Write one JSON line per event to BOTH stdout and gateway.log. Persisting to a
+// real file (not just console) means request traces survive restarts and stay
+// greppable by X-Request-Id even when `npm start` doesn't pipe stdout anywhere.
 const LOG_FILE = path.join(__dirname, "gateway.log");
 function logEvent(obj) {
   const line = JSON.stringify({ ts: new Date().toISOString(), ...obj });
@@ -133,6 +130,6 @@ app.get("/stats", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`FDE gateway on http://localhost:${PORT}  →  AI service ${AI_SERVICE_URL}`);
+  console.log(`Glosa gateway on http://localhost:${PORT}  →  AI service ${AI_SERVICE_URL}`);
   console.log(`Widget served at http://localhost:${PORT}/widget.js`);
 });

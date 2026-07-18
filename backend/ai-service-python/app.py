@@ -1,13 +1,12 @@
 """
-FDE · Assignment 1 · Python AI Service  (this is the real assignment)
+Glosa — Python AI Translation Service
 =====================================================================
 A small FastAPI service that translates English → Mexican Spanish with:
   - an LLM call            (lib/llm.py)
   - a two-tier cache       (lib/cache.py)  — memory + SQLite
-  - structured logging     (lib/logger.py) — provided, wired for you
+  - structured logging     (lib/logger.py)
 
-The Node gateway forwards the browser's requests here. You implement the
-TODOs so the widget lights up. Run:
+The Node gateway forwards the browser's requests here. Run:
 
     python -m venv .venv && source .venv/bin/activate
     pip install -r requirements.txt
@@ -36,14 +35,14 @@ load_dotenv()
 MODEL = os.getenv("MODEL", "claude-sonnet-4-6")
 DB_PATH = os.getenv("TRANSLATION_DB_PATH", "translations.db")
 
-app = FastAPI(title="FDE Live Translate — AI Service")
+app = FastAPI(title="Glosa — Live Translate AI Service")
 log = get_logger("ai-service")
 cache = TwoTierCache(DB_PATH)
 
 
 # The contract specifies 400 for a bad request body; FastAPI's default for a
 # validation failure is 422. Remap it so the AI service returns 400 (matching the
-# gateway and the assignment contract) whether hit via the gateway or directly.
+# gateway's API contract) whether hit via the gateway or directly.
 @app.exception_handler(RequestValidationError)
 async def _on_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
     return JSONResponse(
@@ -96,7 +95,7 @@ async def translate_one(text: str, target: str) -> dict:
 
     t0 = time.perf_counter()
 
-    # Cache-first flow. A cache HIT never calls the LLM (the assignment's core
+    # Cache-first flow. A cache HIT never calls the LLM (the service's core
     # invariant); a MISS translates once, then stores it so the next identical
     # (text, target) is a hit. latencyMs is measured from t0 on BOTH paths, so a
     # hit (memory/SQLite) reads dramatically faster than a miss (LLM round-trip).

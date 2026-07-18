@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-FDE · Assignment 1 · Benchmark & SLA gate  (PROVIDED — you run it, don't build it)
+Glosa — Benchmark & SLA gate
 =================================================================================
-Fires a realistic workload at your backend, measures latency / throughput /
+Fires a realistic workload at the backend, measures latency / throughput /
 cache-hit-rate / cost, and checks the results against the SLA in sla.json.
 
-It talks to the same contract the widget uses, so it measures what your users
+It talks to the same contract the widget uses, so it measures what users
 actually feel. By default it hits the Node gateway (end-to-end). Use --direct
 to hit the Python AI service instead.
 
@@ -16,7 +16,7 @@ Usage:
     python bench.py --rounds 6 --concurrency 16
     python bench.py --json results.json    # also write machine-readable output
 
-Exit code is non-zero if any SLA fails — so it works in CI / as a grading gate.
+Exit code is non-zero if any SLA fails — so it works as a CI gate.
 Standard library only; no pip install needed.
 """
 import argparse
@@ -99,7 +99,7 @@ def run_phase(base: str, items, concurrency: int):
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="FDE Assignment 1 benchmark & SLA gate")
+    ap = argparse.ArgumentParser(description="Glosa benchmark & SLA gate")
     ap.add_argument("--sla", default=str(HERE / "sla.json"))
     ap.add_argument("--target", default=None, help="override target base URL")
     ap.add_argument("--direct", action="store_true", help="target AI service on :8000 instead of the gateway")
@@ -115,7 +115,7 @@ def main() -> int:
     rounds = args.rounds or cfg["workload"]["rounds"]
     concurrency = args.concurrency or cfg["workload"]["concurrency"]
 
-    print(f"\nFDE · Assignment 1 — Benchmark")
+    print(f"\nGlosa — Benchmark")
     print(f"  target      {base}")
     print(f"  workload    {len(WORKLOAD)} phrases × {rounds} rounds   concurrency {concurrency}")
 

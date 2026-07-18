@@ -1,5 +1,5 @@
 """
-lib/logger.py — structured JSON logging  (PROVIDED — you may extend)
+lib/logger.py — structured JSON logging
 ====================================================================
 Emits one JSON object per line to stdout AND to ai-service.log. Any keyword
 you pass via `extra=` is merged into the line, so `log.info("translate",

@@ -1,18 +1,16 @@
-# AGENTS.md — non-negotiables for this assignment
+# AGENTS.md — engineering constraints for Glosa
 
-You are helping a student complete **FDE Assignment 1 — Live Translate**. Read
-`README.md` for the full brief. This file is the contract you must satisfy. Do
-not relax, reinterpret, or "improve" these requirements — conform to them.
+Glosa is a live web-page translation product (English → Mexican Spanish). This
+file states the invariants any change must preserve; see `README.md` for the
+architecture. Don't relax or reinterpret these — conform to them.
 
-## What you may and may not touch
+## Where the work lives
 
-- **BUILD:** `backend/ai-service-python/` (LLM, cache, logging — the core work)
-  and `backend/gateway-node/` (two `TODO (YOU)` blocks: request-logging
-  middleware + `callAiService()` proxy).
-- **DO NOT EDIT:** `widget/`, `loader/`, `extension/`, `demo-pages/`,
-  `benchmark/`. These are the provided frontend and the grader. The widget is
-  the acceptance test — make it work unmodified. If something seems to require
-  editing them, you've misread the contract.
+- **Services:** `backend/ai-service-python/` (LLM, cache, logging — the core)
+  and `backend/gateway-node/` (request-logging middleware + `callAiService()` proxy).
+- **Stable interfaces — treat as fixed:** `widget/`, `loader/`, `extension/`,
+  `demo-pages/`, `benchmark/`. The widget is the acceptance test — it must work
+  unmodified. If something seems to require editing them, the contract has been misread.
 
 ## Hard requirements (all must hold)
 
@@ -29,9 +27,9 @@ not relax, reinterpret, or "improve" these requirements — conform to them.
 - Return the translation ONLY: no preamble, no explanations, no wrapping quotes.
 - Preserve numbers, prices (`$`), and product/model codes verbatim.
 - Read the API key from `.env`. Never hard-code a key. Keep the provider swappable.
-- **Fail loud on LLM errors.** If the provider call fails, propagate the error so the gateway returns `502` and log it. NEVER wrap the call in a `try/except` that returns the original English as if it were translated — a silent fallback that returns the input on failure is an **automatic fail**. (This is a real bug we've seen ship: a dependency mismatch made every call throw, the `except` returned the input untouched, and the "translator" silently served English for weeks.)
+- **Fail loud on LLM errors.** If the provider call fails, propagate the error so the gateway returns `502` and log it. NEVER wrap the call in a `try/except` that returns the original English as if it were translated — a silent fallback that serves the input on failure is a real, shipped-in-the-wild bug this codebase refuses to allow.
 
-### Caching (this is the point of the assignment)
+### Caching (core)
 - Identical `(text, target)` MUST NOT call the LLM twice.
 - `cached: true` ONLY when the response came from cache.
 - Two tiers: in-memory dict + SQLite. The SQLite tier MUST survive a process restart.
@@ -40,12 +38,8 @@ not relax, reinterpret, or "improve" these requirements — conform to them.
 
 ### Logging & tracing
 - Gateway: one structured line per request (method, url, status, duration ms).
-- AI service: one structured line per translation (cached, latencyMs, chars). Use the provided `lib/logger.py`.
-- **Trace correlation (your first trace):** the gateway derives a request ID for every request
-  — reusing an inbound `X-Request-Id` header if present, otherwise generating one — logs it, and
-  forwards it to the AI service (`x-request-id` header). The AI service logs that same ID on its
-  translation line. One request must be greppable end-to-end across both services by that single
-  ID. Keep it this simple — full tracing comes later.
+- AI service: one structured line per translation (cached, latencyMs, chars). Use `lib/logger.py`.
+- **Trace correlation:** the gateway derives a request ID for every request — reusing an inbound `X-Request-Id` header if present, otherwise generating one — logs it, and forwards it to the AI service (`x-request-id` header). The AI service logs that same ID on its translation line. One request must be greppable end-to-end across both services by that single ID.
 
 ### Performance / SLA gate
 - `python benchmark/bench.py` MUST exit `0`. It enforces `benchmark/sla.json`:
@@ -53,16 +47,14 @@ not relax, reinterpret, or "improve" these requirements — conform to them.
 
 ### Deploy
 - Each service starts locally with a single documented command (`npm start`; `uvicorn app:app --port 8000`).
-- **Ship it for real on Fly.io.** Deploy both services (`fly launch` → `fly deploy`) and point
-  the extension popup's backend URL at the public gateway. "Deployed, not a demo" is the point
-  of this track — the live-website test must pass against the deployed gateway, not just localhost.
+- Both services deploy to Fly.io (`fly launch` → `fly deploy`); the extension points at the public gateway. The live-website test must pass against the deployed gateway, not just localhost.
 
 ### Hygiene
 - Never commit `.env`, `node_modules/`, `.venv/`, `*.db`, or `*.log`.
 
-## Definition of done — verify, don't assume
+## Acceptance checks — verify, don't assume
 
-Run every step and confirm it passes before telling the student you're done:
+Run every step and confirm it passes before considering a change complete:
 
 ```bash
 # 1. both services up
@@ -91,13 +83,11 @@ grep "<request-id>" gateway.log ai-service.log   # must appear in BOTH
 curl -sf https://<your-app>.fly.dev/health
 ```
 
-If any check fails, fix the backend — not the frontend, not the benchmark, not the SLA.
+A failing check means a backend bug — fix the backend, not the frontend, the benchmark, or the SLA.
 
-## Submission
+## Evaluation
 
-The deliverable is a **Product Evaluation + video demo**. Generate the report with
-the bundled **`/fde-live-translate-eval`** skill: it runs the rubric (`eval/eval.py`)
-and benchmark (`benchmark/bench.py`), does a **live-website test on a real site the
-student doesn't control (e.g. homedepot.com)**, and writes `PRODUCT_EVAL.md` (PDF
-optional). Do not fabricate any numbers or sample translations — every value comes
-from an actual run.
+Product quality is captured in `PRODUCT_EVAL.md`, generated by the `/product-eval`
+skill: it runs the checks (`eval/eval.py`) and benchmark (`benchmark/bench.py`),
+does a live-website test on a real site (e.g. homedepot.com), and writes the report.
+Every value comes from an actual run — never fabricate numbers or sample translations.
