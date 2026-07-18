@@ -26,7 +26,7 @@ This writes, next to this file:
 
 - **`auto` criteria** are checked right here by running the backend: contract
   shapes, cache behavior + persistence, the SLA benchmark, logging/observability,
-  and status codes. See `rubric.json` for the exact checks.
+  and status codes. See `criteria.json` for the exact checks.
 - **`manual` criteria** — Mexican-Spanish quality and deploy/docs — are reviewed
   by hand using the evidence the report captures (sample translations, cost/latency numbers).
 

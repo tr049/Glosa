@@ -29,7 +29,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-RUBRIC = json.loads((HERE / "rubric.json").read_text())
+CRITERIA = json.loads((HERE / "criteria.json").read_text())
 
 
 def get(url, timeout=10):
@@ -72,7 +72,7 @@ def main():
         scores[cid] = pts
         notes[cid] = note
 
-    crit = {c["id"]: c for c in RUBRIC["criteria"]}
+    crit = {c["id"]: c for c in CRITERIA["criteria"]}
 
     # ---- widget_lights_up: contract works ----
     s1, b1 = post(args.target + "/translate", {"text": "Good morning, welcome!", "target": "es-MX"})
@@ -181,17 +181,17 @@ def main():
         ev["deploy_health_ok"] = None
 
     # ---- manual criteria: not auto-scored ----
-    for c in RUBRIC["criteria"]:
+    for c in CRITERIA["criteria"]:
         if c["type"] == "manual":
             scores.setdefault(c["id"], None)
 
-    auto_total = sum(c["points"] for c in RUBRIC["criteria"] if c["type"] == "auto")
-    auto_got = sum(scores[c["id"]] for c in RUBRIC["criteria"] if c["type"] == "auto")
-    manual_total = sum(c["points"] for c in RUBRIC["criteria"] if c["type"] == "manual")
+    auto_total = sum(c["points"] for c in CRITERIA["criteria"] if c["type"] == "auto")
+    auto_got = sum(scores[c["id"]] for c in CRITERIA["criteria"] if c["type"] == "auto")
+    manual_total = sum(c["points"] for c in CRITERIA["criteria"] if c["type"] == "manual")
 
     # ---- write report.json ----
     report = {
-        "project": RUBRIC["project"],
+        "project": CRITERIA["project"],
         "target": args.target,
         "auto_score": auto_got,
         "auto_max": auto_total,
@@ -204,13 +204,13 @@ def main():
 
     # ---- write REPORT.md ----
     md = []
-    md.append(f"# {RUBRIC['project']} — Evaluation Report\n")
+    md.append(f"# {CRITERIA['project']} — Evaluation Report\n")
     md.append(f"- **Backend target:** `{args.target}`")
     md.append(f"- **Automated checks:** **{auto_got} / {auto_total} passed**  ·  {manual_total} pts reviewed manually\n")
     md.append("## Criteria\n")
     md.append("| Criterion | Type | Points | Result |")
     md.append("|---|---|---|---|")
-    for c in RUBRIC["criteria"]:
+    for c in CRITERIA["criteria"]:
         sc = scores[c["id"]]
         result = notes.get(c["id"], "see evidence") if c["type"] == "auto" else "manual review — see evidence"
         got = f"{sc}/{c['points']}" if sc is not None else f"—/{c['points']}"
